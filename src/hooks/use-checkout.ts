@@ -87,6 +87,46 @@ export const useCheckout = create<CheckoutState>((set) => ({
       }
     }
 
+    // Cursos e e-books passam pela página /obrigado somente depois que o
+    // CheckoutModal confirma o pagamento e executa onSuccess.
+    if (
+      typeof window !== "undefined" &&
+      (resolvedProduct.productType === "course" ||
+        resolvedProduct.productType === "ebook")
+    ) {
+      const originalOnSuccess = resolvedProduct.onSuccess;
+      const purchaseSnapshot = {
+        productId: resolvedProduct.productId,
+        productType: resolvedProduct.productType,
+        title: resolvedProduct.title,
+        cover: resolvedProduct.cover ?? null,
+        description: resolvedProduct.description ?? null,
+      };
+
+      resolvedProduct = {
+        ...resolvedProduct,
+        onSuccess: () => {
+          try {
+            sessionStorage.setItem(
+              "ronnei_purchase_thank_you",
+              JSON.stringify({
+                ...purchaseSnapshot,
+                confirmedAt: new Date().toISOString(),
+              }),
+            );
+          } catch {
+            // Falha de storage não altera a confirmação real do pagamento.
+          }
+
+          try {
+            originalOnSuccess?.();
+          } finally {
+            window.location.assign("/obrigado");
+          }
+        },
+      };
+    }
+
     gtmBeginCheckout({
       productId: resolvedProduct.productId,
       productType: resolvedProduct.productType,
