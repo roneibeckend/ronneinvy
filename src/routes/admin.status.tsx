@@ -14,6 +14,7 @@ import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { useAuth } from "@/hooks/use-auth";
 import { getOperationalStatus, type OpsHealth } from "@/lib/ops-status.functions";
+import { MediaOptimizerCard } from "@/components/admin/MediaOptimizerCard";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -120,7 +121,6 @@ function AdminStatusPage() {
         </div>
       </header>
 
-
       {error && (
         <Card className="border-red-500/30 bg-red-500/5">
           <CardContent className="p-4 text-sm text-red-300">
@@ -128,6 +128,8 @@ function AdminStatusPage() {
           </CardContent>
         </Card>
       )}
+
+      <MediaOptimizerCard />
 
       {isLoading ? (
         <div className="grid place-items-center py-16">
@@ -162,7 +164,6 @@ function AdminStatusPage() {
               );
             })}
           </section>
-
 
           <Card className="border-white/10 bg-white/[0.03]">
             <CardHeader className="flex flex-col gap-3 p-4 pb-3 sm:flex-row sm:items-center sm:justify-between sm:p-6 sm:pb-3">
