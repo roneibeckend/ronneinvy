@@ -1,7 +1,8 @@
 /**
- * Otimização de URLs de imagem para carregamento rápido nas listagens.
- * - Unsplash: pede uma versão redimensionada/comprimida (evita originais de 2-4 MB).
- * - Supabase Storage: usa o endpoint de transformação de imagem quando disponível.
+ * Ajuste de URLs de imagem para carregamento rápido nas listagens.
+ * - Unsplash: pede uma versão redimensionada/comprimida.
+ * - Supabase Storage privado: a URL assinada precisa apontar para um arquivo
+ *   já otimizado; a compactação é feita no upload pelo image-compression.
  * - Outras URLs: retornadas sem alteração.
  */
 export function optimizedImage(
@@ -13,7 +14,7 @@ export function optimizedImage(
   if (url.startsWith("data:") || url.startsWith("blob:")) return url;
 
   try {
-    // URLs relativas não precisam de otimização remota
+    // URLs relativas não precisam de otimização remota.
     if (!/^https?:\/\//i.test(url)) return url;
 
     const parsed = new URL(url);
@@ -26,8 +27,9 @@ export function optimizedImage(
       return parsed.toString();
     }
 
+    // URLs assinadas do Supabase não podem receber transformações depois de
+    // assinadas. Alterar width/quality aqui invalidaria a assinatura.
     return url;
-
   } catch {
     return url;
   }
