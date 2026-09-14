@@ -1,23 +1,19 @@
 /**
  * Meta/Facebook Pixel helper.
  *
- * Política de rastreamento do Ronnei:
- * - PageView é enviado diretamente pelo Pixel base.
- * - Conversões (InitiateCheckout, Lead, Purchase etc.) ficam em modo manual
- *   por padrão para não competir com eventos configurados no Meta/GTM.
- * - O envio direto de conversões só pode ser reativado explicitamente com
- *   VITE_FB_DIRECT_CONVERSIONS=true.
+ * Política de rastreamento do Ronnei (modo campanha/manual):
+ * - PageView é o único evento enviado diretamente pelo Pixel base.
+ * - Conversões (InitiateCheckout, Lead, Purchase, AddToCart,
+ *   ViewContent e CompleteRegistration) NÃO são enviadas pelo código.
+ * - Essas conversões devem ser configuradas manualmente no Meta/GTM.
+ *
+ * Importante: este bloqueio é deliberadamente fixo no código para que uma
+ * variável de ambiente esquecida no deploy não reative conversões automáticas
+ * e não duplique os eventos configurados pelo gestor de tráfego.
  */
 
 const FB_PIXEL_ID: string =
   (typeof import.meta !== "undefined" && (import.meta as any).env?.VITE_FB_PIXEL_ID) || "";
-
-const FB_DIRECT_CONVERSIONS_ENABLED =
-  String(
-    (typeof import.meta !== "undefined" &&
-      (import.meta as any).env?.VITE_FB_DIRECT_CONVERSIONS) ||
-      "",
-  ).toLowerCase() === "true";
 
 declare global {
   interface Window {
@@ -40,9 +36,10 @@ let initialized = false;
 /**
  * Carrega o Meta Pixel exatamente uma vez em modo manual.
  *
- * `autoConfig=false` impede a coleta automática de cliques/metadados que pode
- * criar eventos inesperados. `disablePushState=true` impede PageViews extras
- * criados pelo próprio Pixel ao observar history.pushState/replaceState em SPA.
+ * `autoConfig=false` desativa a configuração automática do Pixel antes do
+ * `init`. `disablePushState=true` evita PageViews extras gerados pelo próprio
+ * Pixel ao observar history.pushState/replaceState em uma SPA.
+ *
  * As mudanças de rota continuam sendo rastreadas explicitamente pelo app.
  */
 export function initPixel(): void {
@@ -83,9 +80,9 @@ export function initPixel(): void {
 /**
  * Envio direto ao Meta.
  *
- * PageView permanece ativo para o Pixel base. Eventos de conversão ficam
- * bloqueados por padrão e devem ser definidos no Meta/GTM. Isso evita que um
- * mesmo clique/compra seja contado pelo código e pela configuração manual.
+ * Por política de lançamento, somente PageView pode sair por este helper.
+ * Os nomes de conversão continuam no tipo para manter compatibilidade com os
+ * call sites existentes, mas são descartados antes de chegar ao `fbq`.
  */
 export function trackEvent(
   event:
@@ -99,53 +96,31 @@ export function trackEvent(
   params?: Record<string, any>,
 ): void {
   if (typeof window === "undefined") return;
-  if (event !== "PageView" && !FB_DIRECT_CONVERSIONS_ENABLED) return;
+  if (event !== "PageView") return;
 
   try {
-    window.fbq?.("track", event, params);
+    window.fbq?.("track", "PageView", params);
   } catch (err) {
     console.warn("[pixel] fbq error", err);
   }
 }
 
 /**
- * Cadastro direto no Meta fica desativado junto com as demais conversões.
- * O helper é mantido para compatibilidade e pode ser reativado por ambiente.
+ * Mantido por compatibilidade com o fluxo de autenticação.
+ * O cadastro é medido pelo fluxo manual/GTM e não é enviado diretamente ao Meta.
  */
 export function trackCompleteRegistration(
   userId: string,
   method: "email" | "google" | "facebook" | "apple" | string = "email",
 ): void {
-  if (typeof window === "undefined" || !userId) return;
-  if (!FB_DIRECT_CONVERSIONS_ENABLED) return;
-
-  const marker = `rnv_complete_registration_${userId}`;
-  try {
-    if (localStorage.getItem(marker)) return;
-  } catch {
-    /* O rastreamento ainda pode funcionar sem localStorage. */
-  }
-
-  initPixel();
-  if (!window.fbq) return;
-
-  window.fbq("track", "CompleteRegistration", {
-    content_name: "Cadastro Ronnei na Veia",
-    method,
-    status: "completed",
-  });
-
-  try {
-    localStorage.setItem(marker, "1");
-  } catch {
-    /* noop */
-  }
+  void userId;
+  void method;
 }
 
 /**
  * Helper legado dos CTAs.
- * Em produção ele não envia conversão direta ao Meta por padrão; o evento só
- * volta a ser enviado se VITE_FB_DIRECT_CONVERSIONS=true for definido.
+ * Mantido para não exigir alterações amplas no front, porém não envia
+ * InitiateCheckout diretamente ao Meta no modo campanha/manual.
  */
 export function trackInitiateCheckout(source: string, value = 47.9): void {
   trackEvent("InitiateCheckout", {
