@@ -19,10 +19,18 @@ export function gtmPush(payload: DataLayerEvent): void {
   window.dataLayer.push({ ...payload, timestamp: new Date().toISOString() });
 }
 
-/** Página vista (SPA: chamado a cada mudança de rota). */
+// Evita que o mesmo ciclo de resolução da SPA publique PageView repetido.
+// Ao navegar A -> B -> A, o segundo A continua sendo contabilizado normalmente.
+let lastPageViewKey: string | null = null;
+
+/** Página vista (SPA: chamado a cada mudança real de rota). */
 export function gtmPageView(path?: string): void {
   if (typeof window === "undefined") return;
   const page = path ?? window.location.pathname + window.location.search;
+
+  if (page === lastPageViewKey) return;
+  lastPageViewKey = page;
+
   gtmPush({
     event: "page_view",
     page_path: page,
