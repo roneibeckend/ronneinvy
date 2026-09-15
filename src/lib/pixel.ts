@@ -1,15 +1,14 @@
 /**
  * Meta/Facebook Pixel helper.
  *
- * Política de rastreamento do Ronnei (modo campanha/manual):
- * - PageView é o único evento enviado diretamente pelo Pixel base.
+ * Política de rastreamento do Ronnei (origem única via GTM):
+ * - PageView NÃO é enviado diretamente por este módulo.
  * - Conversões (InitiateCheckout, Lead, Purchase, AddToCart,
- *   ViewContent e CompleteRegistration) NÃO são enviadas pelo código.
- * - Essas conversões devem ser configuradas manualmente no Meta/GTM.
+ *   ViewContent e CompleteRegistration) também NÃO são enviadas diretamente.
+ * - O app publica os eventos no dataLayer por `src/lib/gtm.ts` e o GTM/Meta
+ *   passa a ser a única origem responsável por transformá-los em eventos do Pixel.
  *
- * Importante: este bloqueio é deliberadamente fixo no código para que uma
- * variável de ambiente esquecida no deploy não reative conversões automáticas
- * e não duplique os eventos configurados pelo gestor de tráfego.
+ * Isso evita que o mesmo PageView seja enviado pelo código e novamente pelo GTM.
  */
 
 const FB_PIXEL_ID: string =
@@ -34,13 +33,10 @@ declare global {
 let initialized = false;
 
 /**
- * Carrega o Meta Pixel exatamente uma vez em modo manual.
+ * Inicializa apenas a biblioteca/base do Meta Pixel para compatibilidade.
  *
- * `autoConfig=false` desativa a configuração automática do Pixel antes do
- * `init`. `disablePushState=true` evita PageViews extras gerados pelo próprio
- * Pixel ao observar history.pushState/replaceState em uma SPA.
- *
- * As mudanças de rota continuam sendo rastreadas explicitamente pelo app.
+ * Nenhum evento é disparado aqui. `autoConfig=false` e `disablePushState=true`
+ * impedem que o Pixel gere eventos automáticos em paralelo ao GTM.
  */
 export function initPixel(): void {
   if (typeof window === "undefined") return;
@@ -68,21 +64,19 @@ export function initPixel(): void {
     })(window, document, "script", "https://connect.facebook.net/en_US/fbevents.js");
 
     if (window.fbq) {
-      // Manual Only: desativa a configuração automática ANTES do init.
+      // Base em modo estritamente manual: inicializa, mas não dispara PageView.
       window.fbq.disablePushState = true;
       window.fbq("set", "autoConfig", false, FB_PIXEL_ID);
       window.fbq("init", FB_PIXEL_ID);
-      window.fbq("track", "PageView");
     }
   }
 }
 
 /**
- * Envio direto ao Meta.
+ * Helper legado mantido para compatibilidade com os call sites existentes.
  *
- * Por política de lançamento, somente PageView pode sair por este helper.
- * Os nomes de conversão continuam no tipo para manter compatibilidade com os
- * call sites existentes, mas são descartados antes de chegar ao `fbq`.
+ * Todos os eventos diretos ao Meta ficam bloqueados. O rastreamento oficial
+ * deve sair exclusivamente pelo dataLayer/GTM para existir uma única origem.
  */
 export function trackEvent(
   event:
@@ -95,14 +89,8 @@ export function trackEvent(
     | "CompleteRegistration",
   params?: Record<string, any>,
 ): void {
-  if (typeof window === "undefined") return;
-  if (event !== "PageView") return;
-
-  try {
-    window.fbq?.("track", "PageView", params);
-  } catch (err) {
-    console.warn("[pixel] fbq error", err);
-  }
+  void event;
+  void params;
 }
 
 /**
@@ -120,7 +108,7 @@ export function trackCompleteRegistration(
 /**
  * Helper legado dos CTAs.
  * Mantido para não exigir alterações amplas no front, porém não envia
- * InitiateCheckout diretamente ao Meta no modo campanha/manual.
+ * InitiateCheckout diretamente ao Meta; o evento deve ser configurado no GTM.
  */
 export function trackInitiateCheckout(source: string, value = 47.9): void {
   trackEvent("InitiateCheckout", {
