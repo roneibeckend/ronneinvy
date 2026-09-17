@@ -19,24 +19,15 @@ export function gtmPush(payload: DataLayerEvent): void {
   window.dataLayer.push({ ...payload, timestamp: new Date().toISOString() });
 }
 
-// Evita que o mesmo ciclo de resolução da SPA publique PageView repetido.
-// Ao navegar A -> B -> A, o segundo A continua sendo contabilizado normalmente.
-let lastPageViewKey: string | null = null;
-
-/** Página vista (SPA: chamado a cada mudança real de rota). */
+/**
+ * PageView desativado no app.
+ *
+ * O objetivo é impedir que a aplicação publique qualquer `page_view` no
+ * dataLayer. Os call sites podem continuar chamando este helper sem efeito,
+ * evitando alterações amplas no front enquanto eliminamos esta origem.
+ */
 export function gtmPageView(path?: string): void {
-  if (typeof window === "undefined") return;
-  const page = path ?? window.location.pathname + window.location.search;
-
-  if (page === lastPageViewKey) return;
-  lastPageViewKey = page;
-
-  gtmPush({
-    event: "page_view",
-    page_path: page,
-    page_title: document.title,
-    area: page.startsWith("/admin") ? "admin" : "cliente",
-  });
+  void path;
 }
 
 /* ---------------------------------------------------------------- */
